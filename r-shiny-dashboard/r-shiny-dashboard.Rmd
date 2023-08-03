@@ -1,0 +1,288 @@
+---
+title: "MBTA BUS RELIABILITY"
+output:
+  flexdashboard::flex_dashboard:
+    theme:
+      version: 4
+      bootswatch: minty
+runtime: shiny
+---
+
+```{r}
+#Author: Stuti Singh   
+
+#Date: 2023-07-31  
+
+#Description: This script provides codes on building a dashboard using shiny app and  leaflet map. Here we are creating a reliability map using MBTA Key Bus Routes. 
+```
+
+
+```{r global, include=FALSE}
+#install packages
+
+rm(list=ls())
+requiredPackages <- c('flexdashboard','tidyverse', 'ggplot2', 'data.table', 'dplyr', 'tidyr', 'gmodels', 'Hmisc','car', 'sf', 'leaflet', 'plotly', 'htmlwidgets', 'tibble', 'jsonlite', 'shiny', 'tidycensus','tmap', 'mapview', 'tigris', 'leafsync')
+for(p in requiredPackages){
+  if(!require(p, character.only = TRUE)) install.packages(p) 
+}
+```
+
+```{r, include=FALSE}
+
+#read the required files
+
+MBTA <- st_read("DistilledRoutes_converted")%>%
+  st_zm()
+
+MBTA <- MBTA %>% 
+  rename(
+    MBTA_ROUTE = ROUTE)
+
+MBTA_transform <- st_transform(MBTA, 4326)
+MBTA_transform <- transform(MBTA_transform, MBTA_ROUTE = as.numeric(MBTA_ROUTE))
+
+Reliability <- read.csv("bus_reliability_2022.csv")
+Boston_Race <- st_read("Boston_Race")%>%
+  st_zm()
+
+boston_income <- st_read("Boston_income")%>%
+  st_zm()
+
+```
+
+
+```{r}
+#saving it in a different file name
+
+MBTA_BUS_ROUTES_INBOUND <- MBTA_transform
+```
+
+Column {.tabset}
+---------------------------------------
+
+### Read Me
+
+   
+
+We seek support Bostonians in their efforts to improve their transit systems. By creating a tool to visualize service evaluation, we will help ensure that planning outcomes are transparent and accessible for everyone. 
+
+
+### Map A
+```{r}
+#defining the type (drop down, check box etc) and name for widgets on the app.
+
+selectInput("bus_route", label = "MBTA BUS ROUTES", choices = unique(MBTA_BUS_ROUTES_INBOUND$MBTA_ROUTE), selected = '15')
+selectInput("Demographics", label = "DEMOGRAPHICS", choices = c("Race", "Median Income", "Race + Median Income", "None"), selected = "None")
+checkboxInput("bus_priority", "BUS PRIORITY" , value = FALSE)
+checkboxInput("Reliability", "OTP RELIABILITY" , value = FALSE)
+checkboxInput("Satisfaction", "CUSTOMER SATISFACTION" , value = FALSE)
+```
+
+
+--------------------------------
+
+
+
+
+
+Column{data-width=1050}
+--------------------------------------
+### MAP A
+
+```{r}
+#Creating a map box on the app and defining the width of the map box. Multiple columns can be created as required.  
+#Creating the dot density map beforehand to be used in the app.  
+
+
+boston_dots = as_dot_density(
+    Boston_Race,
+    value = "value",
+    values_per_dot = 20,
+    group = "variable"
+  )
+```
+
+```{r}
+MBTA_BUS_ROUTES_INBOUND["BUS_PRIORITY"] <- "NO"
+MBTA_BUS_ROUTES_INBOUND["Priority_rating"] <- 0
+MBTA_BUS_ROUTES_INBOUND <-MBTA_BUS_ROUTES_INBOUND %>% 
+  mutate(BUS_PRIORITY = case_when(MBTA_ROUTE == 1 ~ "YES", 
+                           MBTA_ROUTE == 39 ~ "YES",
+                           MBTA_ROUTE == 57 ~ "YES",
+                           MBTA_ROUTE == 66 ~ "YES",
+                           MBTA_ROUTE == 93 ~ "YES",
+                           MBTA_ROUTE == 111 ~ "YES",
+                           MBTA_ROUTE == 22 ~ "YES",
+                           MBTA_ROUTE == 73 ~ "YES",
+                           MBTA_ROUTE == 71 ~ "YES",
+                           MBTA_ROUTE == 15 ~ "YES",
+                           MBTA_ROUTE == 71 ~ "YES",
+                           TRUE ~ "NO"))
+
+
+
+Reliability <- Reliability %>% 
+  rename(
+    MBTA_ROUTE = gtfs_route_id)
+
+MBTA_BUS_ROUTES_INBOUND <- merge(MBTA_BUS_ROUTES_INBOUND, Reliability, by = "MBTA_ROUTE")
+
+x <- 65:82
+MBTA_BUS_ROUTES_INBOUND["Satisfaction"] <- NA
+MBTA_BUS_ROUTES_INBOUND$Satisfaction<-sample(x, nrow(MBTA_BUS_ROUTES_INBOUND), replace = TRUE)
+
+MBTA_BUS_ROUTES_INBOUND["Satisfaction_Category"]<- NA
+MBTA_BUS_ROUTES_INBOUND <- MBTA_BUS_ROUTES_INBOUND %>%
+  mutate(Satisfaction_Category = case_when(
+    Satisfaction > 65 & Satisfaction <= 70 ~ "Low 65-70", 
+    Satisfaction > 70 & Satisfaction <= 75 ~ "Moderate 70-75",
+    Satisfaction > 75 & Satisfaction <= 80 ~ "Moderate 75-80",
+    Satisfaction > 80  ~ "High above 80"
+  ))
+```
+
+
+```{r}
+#Rendering the leaflet map for the particular map box. Using if-else statement to define the conditions for the selected widgets.  
+#NOTE: The conditional statements used under MAP A column will show the results only in that map box.  
+
+renderLeaflet({
+   busin <- filter(MBTA_BUS_ROUTES_INBOUND, MBTA_ROUTE == input$bus_route)
+  pal <- colorFactor(palette = c('red', 'blue'), domain= MBTA_BUS_ROUTES_INBOUND$BUS_PRIORITY)
+  pal3 <- colorFactor(palette = c('springgreen4', 'orchid4', 'firebrick'), domain= MBTA_BUS_ROUTES_INBOUND$Reliability_Category)
+
+
+  if(input$Demographics == "Race"){
+    map1 <- tm_shape(boston_dots)+
+      tm_dots(col = "variable",alpha = 0.7,
+          palette = c("#ffeb3b", "#fb8072", "#9c27b0", "#8dd3c7"), border.col = "white" ,border.lwd = 0.01,size = 0.000008, title = "1 dot = 20 people")+
+      tm_layout(legend.outside = TRUE,scale = 2)
+    map2 <- tmap_leaflet(map1)%>% 
+      addPolylines(data = MBTA_BUS_ROUTES_INBOUND, color="black", fillOpacity = 1, weight = 3) %>%
+      addPolylines(data = busin, color = "black", fillOpacity = 3, weight = 8)%>%
+      addProviderTiles(providers$Esri.WorldStreetMap, group = 'Street Map') %>%
+      addProviderTiles(providers$Stamen.Toner, group = 'Toner Lite') %>%
+      addProviderTiles(providers$CartoDB.Positron)%>% addLayersControl(baseGroups = c('Street Map',
+                                  'Toner Lite',
+                                  'World Imagery'),
+                   overlayGroups = c('Census Tract', 'Bus Route'
+                                     ))
+    
+  }
+  
+  else if(input$Demographics == "Median Income"){
+
+    bins <- c(0, 25000, 40000, 70000, 100000, Inf)
+    pal4 <- colorBin("viridis", domain = boston_income$estimate, bins = bins)
+
+    map <- leaflet()%>% addProviderTiles(providers$Esri.WorldStreetMap, group = 'Street Map') %>%
+  addProviderTiles(providers$Stamen.Toner, group = 'Toner Lite') %>%
+  addProviderTiles(providers$CartoDB.Positron)%>%
+  addPolygons(data = boston_income, 
+              fillColor = ~pal4(estimate),
+              weight = 2,
+              opacity = 1,
+              color = NA,
+              dashArray = "3",
+              fillOpacity = 0.5) %>% addLegend(pal = pal4, values = boston_income$estimate, opacity = 0.7, title = "Median Income",
+  position = "bottomright")
+      
+    
+    map1 <- map %>% 
+      addPolylines(data = MBTA_BUS_ROUTES_INBOUND, color="black", fillOpacity = 1, weight = 3)%>%
+      addPolylines(data = busin, color = "black", fillOpacity = 3, weight = 8)%>%
+      addLayersControl(baseGroups = c('Street Map',
+                                  'Toner Lite',
+                                  'World Imagery'),
+                   overlayGroups = c( 'Bus Route'))
+  }
+  
+  else if (input$bus_priority){
+    pal <- colorFactor(palette = c('red', 'blue'), domain= MBTA_BUS_ROUTES_INBOUND$BUS_PRIORITY)
+    map <- leaflet(MBTA_BUS_ROUTES_INBOUND) %>%
+      addProviderTiles(providers$Esri.WorldStreetMap, group = 'Street Map') %>%
+      addProviderTiles(providers$Stamen.Toner, group = 'Toner Lite') %>%
+      addProviderTiles(providers$CartoDB.Positron) %>%
+      addProviderTiles(providers$Esri.WorldImagery , group = 'World Imagery')  %>% 
+      addLegend(pal = pal, values = ~BUS_PRIORITY, opacity = 0.7, title = NULL,
+  position = "bottomright")%>%
+      addPolylines(color = ~pal(BUS_PRIORITY), weight = 3, popup =
+                     paste("Route", MBTA_BUS_ROUTES_INBOUND$MBTA_ROUTE, "<br>",
+                           "BP Type:", MBTA_BUS_ROUTES_INBOUND$BPType))%>%
+      addPolylines(data = busin, color = ~pal(BUS_PRIORITY), weight = 7)%>%
+      addLayersControl(baseGroups = c('Street Map',
+                                  'Toner Lite',
+                                  'World Imagery'),
+                   overlayGroups = c('layer'
+                   ))}
+  
+  else if(input$Reliability){
+    pal3 <- colorFactor(palette = c('springgreen4', 'orchid4', 'firebrick'), domain= MBTA_BUS_ROUTES_INBOUND$Reliability_Category)
+     map <- leaflet(MBTA_BUS_ROUTES_INBOUND) %>%
+      addProviderTiles(providers$Esri.WorldStreetMap, group = 'Street Map') %>%
+      addProviderTiles(providers$Stamen.Toner, group = 'Toner Lite') %>%
+      addProviderTiles(providers$CartoDB.Positron) %>%
+      addProviderTiles(providers$Esri.WorldImagery , group = 'World Imagery')  %>%
+      addPolylines(color = ~pal3(Reliability_Category),weight = 3)%>%
+       addLegend(pal = pal3, values = ~Reliability_Category, opacity = 0.7, title = NULL,
+  position = "bottomright")%>%
+       addPolylines(data = busin, color = ~pal3(Reliability_Category), weight = 7)%>%
+      addLayersControl(baseGroups = c('Street Map',
+                                  'Toner Lite',
+                                  'World Imagery'),
+                   overlayGroups = c('layer'
+                   ))}
+  
+  else if(input$Satisfaction){
+    pal6 <- colorFactor(palette = c('#00838f', '#d32f2f', '#558b2f', '#f57c00'), domain= MBTA_BUS_ROUTES_INBOUND$Satisfaction_Category)
+     map <- leaflet(MBTA_BUS_ROUTES_INBOUND) %>%
+      addProviderTiles(providers$Esri.WorldStreetMap, group = 'Street Map') %>%
+      addProviderTiles(providers$Stamen.Toner, group = 'Toner Lite') %>%
+      addProviderTiles(providers$CartoDB.Positron) %>%
+      addProviderTiles(providers$Esri.WorldImagery , group = 'World Imagery')  %>%
+      addPolylines(color = ~pal6(Satisfaction_Category), weight = 3)%>%
+       addLegend(pal = pal6, values = ~Satisfaction_Category, opacity = 0.7, title = NULL,
+  position = "bottomright")%>%
+       addPolylines(data = busin, color = ~pal3(Reliability_Category), weight = 7)%>%
+      addLayersControl(baseGroups = c('Street Map',
+                                  'Toner Lite',
+                                  'World Imagery'),
+                   overlayGroups = c('layer'
+                   ))}
+  
+
+  
+  else {
+    map <- leaflet(MBTA_BUS_ROUTES_INBOUND) %>%
+      addProviderTiles(providers$Esri.WorldStreetMap, group = 'Street Map') %>%
+      addProviderTiles(providers$Stamen.Toner, group = 'Toner Lite') %>%
+      addProviderTiles(providers$CartoDB.Positron) %>%
+      addProviderTiles(providers$Esri.WorldImagery , group = 'World Imagery')  %>%
+      addPolylines(color = "black",opacity = 1, weight = 4)%>%
+      addPolylines(data = busin, color = "black", fillOpacity = 3, weight = 8)%>%
+      addLayersControl(baseGroups = c('Street Map',
+                                  'Toner Lite',
+                                  'World Imagery'),
+                   overlayGroups = c('layer'
+                   ))}
+  
+})
+
+```
+
+
+
+---------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
