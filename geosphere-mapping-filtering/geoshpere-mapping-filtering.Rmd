@@ -1,0 +1,130 @@
+---
+title: "Filtering and Mapping"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+*Author: Stuti Singh*
+
+*Date: 2023-07-31*
+
+*Description: This script performs R basic filtering and mapping using Leaflet and Geosphere*   
+
+
+
+**Load the required packages**  
+```{r}
+rm(list=ls())
+requiredPackages <- c('foreign','tidyverse', 'ggplot2', 'data.table', 'dplyr', 'tidyr', 'gmodels', 'Hmisc','arrow', 'sf', 'leaflet', 'htmlwidgets', 'gridExtra')
+for(p in requiredPackages){
+  if(!require(p, character.only = TRUE)) install.packages(p) 
+}
+```
+
+**Read the files**   
+*Here we are using a dummy dataset which contains establishments in Texas region providing information about employment, zipcode, location in the form of latitude and longitude and 30 other attributes.*
+
+```{r}
+dat <- read.csv("dummy_data.csv")
+```
+
+**Print first five rows to understand the data**  
+```{r}
+head(dat)
+```
+
+
+**Filter using a row value**    
+*Here we are using a particular zipcode to filter all the rows corresponding to that zipcode value.* 
+```{r}
+filter_zip = dat %>%
+  filter(dat$zipcode == 79118)
+```
+
+
+**Filter using name or a string in a row**    
+*Here we are using the string "WAREHOUSE" to find a company which contains name warehouse.*
+
+```{r}
+substring_to_find <- "WAREHOUSE"
+filter_by_name <- dat[grepl(substring_to_find, dat$company) , ]
+  
+# Display the filtered data
+print(filter_by_name)
+```
+
+**Display the column names**
+```{r}
+colnames(dat)
+```
+
+**Filter using column names**
+```{r}
+Filter_columns <- dat[c("dunsnumber","company","address", "city" ,"state", "zipcode","hqzipcode","hqcity", "latitude","longitude","emp19", "empc19","emphere" ,"empherec", "industry", "NAICS19" )]
+
+print(Filter_columns)
+```
+
+
+**Save the new dataset as a csv**
+```{r}
+write.csv(filter_by_name, file = "filter_by_name.csv", row.names = FALSE)
+```
+
+
+```{r}
+dat$longitude <- paste0("-", dat$longitude)
+dat$longitude <- as.numeric(dat$longitude)
+head(dat)
+
+```
+
+**Creating a leaflet map using the latitude and longitude values**
+```{r}
+map_a <- leaflet() %>%
+  addTiles() %>%
+  addCircleMarkers(data = dat, fillColor = "green", fillOpacity = 0.6, weight = 0.5, group = ~zipcode)%>%
+  addLayersControl(overlayGroups = unique(dat$zipcode), options = layersControlOptions(collapsed = FALSE))
+
+
+map_a
+```
+
+
+
+**Filtering points within 100 miles from a given point**
+```{r}
+# Specify the coordinates of the center point (e.g., 40.0 latitude and -100.0 longitude)
+center_lat <- 33.1078
+center_lon <- -96.7033
+
+# Specify the radius in miles
+radius_miles <- 100
+
+# Calculate the distance in miles between each marker and the center point
+dat <- dat %>%
+  mutate(
+    distance_miles = geosphere::distGeo(matrix(c(center_lon, center_lat), ncol = 2), matrix(c(longitude, latitude), ncol = 2)) * 0.000621371
+  )
+
+# Filter the data to include only markers within the desired radius
+data_within_radius <- dat %>%
+  filter(distance_miles <= radius_miles)
+
+# Create the Leaflet map
+map_b <- leaflet(data = data_within_radius) %>%
+  addTiles() %>%
+  addCircleMarkers(lng = ~longitude, lat = ~latitude, radius = 2, color = "green", fill = TRUE, popup = ~company, group = ~zipcode)%>%
+  addLayersControl(overlayGroups = unique(data_within_radius$zipcode), options = layersControlOptions(collapsed = FALSE))
+
+map_b
+```
+
+
+**Save the map as html file**
+```{r}
+saveWidget(map_b, file = "MAP.html")
+
+```
