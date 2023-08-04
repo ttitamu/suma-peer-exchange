@@ -1,0 +1,88 @@
+ ---
+title: "R Notebook"
+output: html_notebook
+---
+
+*Author: Stuti Singh*
+
+*Date: 2023-07-31*
+
+*Description: This script performs visualization tasks using ggplot*   
+
+
+```{r global, include=FALSE}
+#Load the required packages
+rm(list=ls())
+requiredPackages <- c('flexdashboard','tidyverse', 'ggplot2', 'data.table', 'dplyr', 'tidyr', 'gmodels', 'Hmisc','car', 'sf', 'leaflet', 'plotly', 'htmlwidgets', 'tibble', 'jsonlite', 'shiny', 'tidycensus','tmap', 'mapview', 'tigris', 'leafsync', 'reshape2')
+for(p in requiredPackages){
+  if(!require(p, character.only = TRUE)) install.packages(p) 
+}
+```
+
+
+```{r}
+#read the data
+dat <- read.csv("Data_gameday.csv")
+```
+
+
+```{r}
+#filtering the data
+Gameday <- dat%>%filter(Day == "Gameday")
+Gameday <- Gameday[, -which(names(Gameday) == "Day")]
+```
+
+
+
+```{r}
+#melt data frame from short into long format
+dfm <- melt(dat[,c('category','Monday','Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')],id.vars = 1)
+```
+
+```{r}
+#plot using geom_histogram
+y_min <- 0  # Replace with your desired minimum x value
+y_max <- 40000 
+
+ggplot(dfm,aes(x = category,y = value)) + 
+    geom_histogram(aes(fill = variable),stat = "identity",position = "dodge") +
+  scale_y_continuous(limits = c(y_min, y_max))+ 
+    scale_y_log10()
+```
+```{r}
+dfm_1 <- melt(Gameday, id.vars = "category")
+```
+
+```{r}
+#plot using geom_point
+ggplot(dfm_1, aes(category,value, col=variable)) +
+  geom_point()
+```
+
+
+```{r}
+NonGameday <- dat%>%filter(Day == "Non-Gameday")
+NonGameday <- NonGameday[, -which(names(NonGameday) == "Day")]
+```
+
+
+
+```{r}
+#melt data frame into long format
+dfm_1 <- melt(NonGameday[,c('category','Monday','Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday')],id.vars = 1)
+```
+
+```{r}
+y_min <- 0  # Replace with your desired minimum x value
+y_max <- 40000 
+
+ggplot(dfm_1,aes(x = category,y = value)) + 
+    geom_histogram(aes(fill = variable),stat = "identity",position = "dodge") +
+  scale_y_continuous(limits = c(y_min, y_max))+ 
+    scale_y_log10()
+```
+
+
+
+
+

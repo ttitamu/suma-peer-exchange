@@ -1,0 +1,19 @@
+Day,category,Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday
+Gameday,Fast Food,7336,7378,7551,7821,8525,7605,6457
+Gameday,Restaurants,5348,5467,5275,6079,8257,11615,6593
+Gameday,Convenience Store and Gas Station,2692,2772,2673,3023,3918,3549,2919
+Gameday,Kyle Field,1087,605,524,403,1261,14405,187
+Gameday,Grocery Store,1645,1453,1379,1463,1909,1712,1830
+Gameday,Tailgate Hubs,841,1157,817,1024,1560,3123,590
+Gameday,Bars,513,573,619,843,1435,1763,908
+Gameday,Liquor Store,277,337,310,398,507,415,395
+Gameday,Hotels,133,164,191,177,222,200,235
+Non-Gameday,Fast Food,6766,6874,6818,7412,8535,7786,5809
+Non-Gameday,Restaurants,4653,4664,4892,5585,7004,7046,5646
+Non-Gameday,Convenience Store and Gas Station,2777,2780,2698,2991,3922,3666,2934
+Non-Gameday,Kyle Field,1602,1425,1389,1411,1671,1827,1957
+Non-Gameday,Grocery Store,205,299,220,248,211,90,107
+Non-Gameday,Tailgate Hubs,478,499,589,816,1188,1477,1010
+Non-Gameday,Bars,683,982,693,933,924,634,444
+Non-Gameday,Liquor Store,310,252,338,358,485,547,343
+Non-Gameday,Hotels,123,139,172,148,169,96,87
